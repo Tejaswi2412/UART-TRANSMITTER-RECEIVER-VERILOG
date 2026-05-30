@@ -1,9 +1,6 @@
 # UART Controller — Verilog Implementation
 
-![Language](https://img.shields.io/badge/Language-Verilog-blue)
-![Simulator](https://img.shields.io/badge/Simulator-Icarus%20Verilog-green)
-![Status](https://img.shields.io/badge/Status-Verified-brightgreen)
-![Baud Rate](https://img.shields.io/badge/Baud%20Rate-9600-orange)
+[![Language](https://img.shields.io/badge/Language-Verilog-blue)](https://img.shields.io/badge/Language-Verilog-blue) [![Simulator](https://img.shields.io/badge/Simulator-Icarus%20Verilog-green)](https://img.shields.io/badge/Simulator-Icarus%20Verilog-green) [![Status](https://img.shields.io/badge/Status-Verified-brightgreen)](https://img.shields.io/badge/Status-Verified-brightgreen) [![Baud Rate](https://img.shields.io/badge/Baud%20Rate-9600-orange)](https://img.shields.io/badge/Baud%20Rate-9600-orange)
 
 A fully functional **UART (Universal Asynchronous Receiver Transmitter)** controller implemented in Verilog HDL. The design includes a baud rate generator, FSM-based transmitter, independent-counter-based receiver with middle sampling, top-level integration module, and a self-checking testbench. Verified using Icarus Verilog simulator with waveform analysis in GTKWave.
 
@@ -20,6 +17,7 @@ A fully functional **UART (Universal Asynchronous Receiver Transmitter)** contro
 - [How to Run](#how-to-run)
 - [Directory Structure](#directory-structure)
 - [Tools Used](#tools-used)
+- [Synthesis Results](#synthesis-results)
 - [Future Improvements](#future-improvements)
 - [Waveform](#waveform)
 
@@ -46,19 +44,19 @@ IDLE → START(0) → D0 → D1 → D2 → D3 → D4 → D5 → D6 → D7 → ST
 ## Architecture
 
 ```
-                    ┌─────────────────────────────────────────┐
-                    │              uart_top.v                 │
-                    │                                         │
-         clk ──────→│──→ baud_rate ──baud_tick──→ uart_tx ────│──→ tx_line ──┐
-       start ──────→│                         ↑               │              │
-     tx_data ──────→│                      clk, start         │              │
-                    │                      tx_data            │              │
-                    │                                         │              │
-     rx_data ←──────│←── uart_rx ←──────────────────────────← │←─────────────┘
-        done ←──────│         ↑                               │
-                    │      clk, rx_line                       │
-                    │   (independent counter)                 │
-                    └─────────────────────────────────────────┘
+               ┌─────────────────────────────────────────┐
+               │              uart_top.v                 │
+               │                                         │
+    clk ──────→│──→ baud_rate ──baud_tick──→ uart_tx ────│──→ tx_line ──┐
+  start ──────→│                         ↑               │              │
+tx_data ──────→│                      clk, start         │              │
+               │                      tx_data            │              │
+               │                                         │              │
+rx_data ←──────│←── uart_rx ←──────────────────────────← │←─────────────┘
+   done ←──────│         ↑                               │
+               │      clk, rx_line                       │
+               │   (independent counter)                 │
+               └─────────────────────────────────────────┘
 ```
 
 **Key design choice:** The receiver uses an **independent internal counter** that resets on start bit detection, enabling accurate middle-of-bit sampling without depending on the transmitter's baud_tick signal.
@@ -68,6 +66,7 @@ IDLE → START(0) → D0 → D1 → D2 → D3 → D4 → D5 → D6 → D7 → ST
 ## Module Description
 
 ### 1. `uart_baud_rate.v` — Baud Rate Generator
+
 Generates a `baud_tick` pulse every 5208 clock cycles (9600 baud at 50MHz).
 
 ```
@@ -76,31 +75,32 @@ cycles_per_bit = clock_frequency / baud_rate
                = 5208 cycles
 ```
 
-| Port | Direction | Width | Description |
-|------|-----------|-------|-------------|
-| `clk` | input | 1 | 50MHz system clock |
-| `baud_tick` | output | 1 | Pulses HIGH every 5208 cycles |
+| Port        | Direction | Width | Description                   |
+| ----------- | --------- | ----- | ----------------------------- |
+| `clk`       | input     | 1     | 50MHz system clock            |
+| `baud_tick` | output    | 1     | Pulses HIGH every 5208 cycles |
 
 ---
 
 ### 2. `uart_tx.v` — UART Transmitter
+
 FSM-based transmitter with 11 states. Converts 8-bit parallel data into a serial bit stream.
 
-| Port | Direction | Width | Description |
-|------|-----------|-------|-------------|
-| `clk` | input | 1 | System clock |
-| `baud_tick` | input | 1 | Timing pulse from baud rate generator |
-| `start` | input | 1 | Trigger signal to begin transmission |
-| `data` | input | 8 | Parallel data to transmit |
-| `tx_line` | output | 1 | Serial output line |
-| `idle` | output | 1 | HIGH when transmitter is free |
+| Port        | Direction | Width | Description                           |
+| ----------- | --------- | ----- | ------------------------------------- |
+| `clk`       | input     | 1     | System clock                          |
+| `baud_tick` | input     | 1     | Timing pulse from baud rate generator |
+| `start`     | input     | 1     | Trigger signal to begin transmission  |
+| `data`      | input     | 8     | Parallel data to transmit             |
+| `tx_line`   | output    | 1     | Serial output line                    |
+| `idle`      | output    | 1     | HIGH when transmitter is free         |
 
 **FSM States:**
+
 ```
 State 0  → IDLE   : tx_line = 1, wait for start=1
 State 1  → START  : tx_line = 0, UART start bit
 State 2  → D0     : tx_line = data[0]
-State 3  → D1     : tx_line = data[1]
 ...
 State 9  → D7     : tx_line = data[7]
 State 10 → STOP   : tx_line = 1, UART stop bit → return to IDLE
@@ -109,16 +109,18 @@ State 10 → STOP   : tx_line = 1, UART stop bit → return to IDLE
 ---
 
 ### 3. `uart_rx.v` — UART Receiver (Independent Counter)
+
 Receives serial data and reconstructs 8-bit parallel output. Uses an **independent internal counter** for accurate middle-of-bit sampling.
 
-| Port | Direction | Width | Description |
-|------|-----------|-------|-------------|
-| `clk` | input | 1 | System clock |
-| `rx_line` | input | 1 | Serial input line |
-| `data` | output | 8 | Reconstructed parallel data |
-| `done` | output | 1 | HIGH when full byte received |
+| Port      | Direction | Width | Description                  |
+| --------- | --------- | ----- | ---------------------------- |
+| `clk`     | input     | 1     | System clock                 |
+| `rx_line` | input     | 1     | Serial input line            |
+| `data`    | output    | 8     | Reconstructed parallel data  |
+| `done`    | output    | 1     | HIGH when full byte received |
 
 **Middle Sampling Strategy:**
+
 ```
 Start bit detected (rx_line=0)
         ↓
@@ -128,68 +130,52 @@ rx_count == 2603 → sample (middle of bit) ✅
 rx_count == 5207 → advance state, reset counter
 ```
 
-This ensures each bit is sampled at its most stable center point, away from transition edges.
-
-**Why independent counter?**
-If RX shared baud_tick with TX, both would transition states simultaneously. RX would sample at the edge of each bit (unstable) instead of the middle (stable). The independent counter, triggered by start bit detection, guarantees correct phase alignment.
-
 ---
 
 ### 4. `uart_top.v` — Top Level Integration
-Instantiates and connects all three modules.
 
-| Port | Direction | Width | Description |
-|------|-----------|-------|-------------|
-| `clk` | input | 1 | System clock |
-| `start` | input | 1 | Transmission trigger |
-| `tx_data` | input | 8 | Data to transmit |
-| `rx_data` | output | 8 | Received data |
-| `done` | output | 1 | Reception complete flag |
+| Port      | Direction | Width | Description             |
+| --------- | --------- | ----- | ----------------------- |
+| `clk`     | input     | 1     | System clock            |
+| `start`   | input     | 1     | Transmission trigger    |
+| `tx_data` | input     | 8     | Data to transmit        |
+| `rx_data` | output    | 8     | Received data           |
+| `done`    | output    | 1     | Reception complete flag |
 
 ---
 
 ### 5. `uart_tb.v` — Testbench
-Self-checking testbench that:
-- Generates 50MHz clock (`#10` toggle with `timescale 1ns/1ps`)
-- Drives `tx_data = 8'b00010110`
-- Triggers transmission via `start` pulse
-- Monitors `done` and `rx_data` for verification
-- Dumps VCD waveform for GTKWave analysis
+
+Self-checking testbench that generates 50MHz clock, drives `tx_data = 8'b00010110`, triggers transmission, monitors `done` and `rx_data`, and dumps VCD for GTKWave analysis.
 
 ---
 
 ## Design Specifications
 
-| Parameter | Value |
-|-----------|-------|
-| Clock Frequency | 50 MHz |
-| Baud Rate | 9600 |
-| Data Bits | 8 |
-| Stop Bits | 1 |
-| Parity | None |
-| Cycles per Bit | 5208 |
-| Bit Duration | 104.16 µs |
-| Frame Duration | 1,145,760 ns (~1.14 ms) |
-| HDL Standard | Verilog |
+| Parameter       | Value                   |
+| --------------- | ----------------------- |
+| Clock Frequency | 50 MHz                  |
+| Baud Rate       | 9600                    |
+| Data Bits       | 8                       |
+| Stop Bits       | 1                       |
+| Parity          | None                    |
+| Cycles per Bit  | 5208                    |
+| Bit Duration    | 104.16 µs               |
+| Frame Duration  | 1,145,760 ns (~1.14 ms) |
+| HDL Standard    | Verilog                 |
 
 ---
 
 ## Key Design Decisions
 
 ### FSM for Transmitter
-The transmitter uses an 11-state Finite State Machine (FSM) driven by `baud_tick`. Each state holds the TX line value for exactly one bit period (5208 clock cycles). This approach cleanly separates timing logic (baud generator) from data logic (FSM).
+The transmitter uses an 11-state FSM driven by `baud_tick`. Each state holds the TX line value for exactly one bit period.
 
 ### Independent Counter for Receiver
-The receiver maintains its own 13-bit counter (`rx_count`) that resets upon detecting the falling edge of `rx_line` (start bit). This provides:
-- **Phase synchronization** — counter aligns to actual start of frame
-- **Middle sampling** — samples at `rx_count == 2603` (halfway through each bit)
-- **Independence from TX** — no shared timing signals required
+The receiver maintains its own 13-bit counter (`rx_count`) that resets upon detecting the falling edge of `rx_line`. Samples at `rx_count == 2603` (halfway through each bit).
 
 ### Non-Blocking Assignments
-All sequential logic uses `<=` (non-blocking assignments) inside `always @(posedge clk)` blocks, correctly modeling flip-flop behavior and avoiding race conditions.
-
-### Timescale Declaration
-All modules include `` `timescale 1ns/1ps `` to ensure correct time unit interpretation across the entire design hierarchy.
+All sequential logic uses `<=` inside `always @(posedge clk)` blocks, correctly modeling flip-flop behavior.
 
 ---
 
@@ -203,47 +189,23 @@ Received    : 8'b00010110  ✅ MATCH
 done        : 1            ✅ ASSERTED at ~1,145,810 ns
 ```
 
-**Terminal output:**
-```
-Time=1093730000  done=0  rx_data=00010110
-Time=1145810000  done=1  rx_data=00010110  ← transmission complete!
-```
-
-**GTKWave waveforms confirm:**
-- Clock toggling at 50MHz
-- Start pulse triggering FSM
-- tx_line carrying serial bits
-- rx_data matching tx_data after full frame
-- done asserting at correct time
-
 ---
 
 ## How to Run
 
-### Prerequisites
-- [Icarus Verilog](http://iverilog.icarus.com/) — HDL simulator
-- [GTKWave](http://gtkwave.sourceforge.net/) — Waveform viewer
-
 ### Compile
-```bash
+```
 iverilog -o uart_tb uart_tb.v uart_top.v uart_tx.v uart_rx.v uart_baud_rate.v
 ```
 
 ### Simulate
-```bash
+```
 vvp uart_tb
 ```
 
 ### View Waveforms
-```bash
+```
 gtkwave uart_tb.vcd
-```
-
-### Expected Output
-```
-VCD info: dumpfile uart_tb.vcd opened for output.
-Time=1145810000  done=1  rx_data=00010110
-$finish called at 5000200000
 ```
 
 ---
@@ -264,11 +226,41 @@ uart_project/
 
 ## Tools Used
 
-| Tool | Version | Purpose |
-|------|---------|---------|
-| Icarus Verilog | 12.0 | HDL compilation and simulation |
-| GTKWave | 3.3.108 | Waveform visualization |
-| VS Code | Latest | Code editor |
+| Tool           | Version | Purpose                        |
+| -------------- | ------- | ------------------------------ |
+| Icarus Verilog | 12.0    | HDL compilation and simulation |
+| GTKWave        | 3.3.108 | Waveform visualization         |
+| VS Code        | Latest  | Code editor                    |
+
+---
+
+## Synthesis Results
+
+**Target Device:** Xilinx Artix-7 `xc7a35tcpg236-1` | **Tool:** Vivado 2025.1
+
+| Resource | Used | Available | Utilization |
+| --- | --- | --- | --- |
+| Slice LUTs | 43 | 20800 | <1% |
+| Slice Registers (FFs) | 53 | 41600 | <1% |
+| Bonded IOB | 19 | 106 | <1% |
+| BUFGCTRL | 1 | 32 | <1% |
+
+**Timing Summary**
+- Failing Endpoints: **0**
+- Total Negative Slack (TNS): 0.000 ns
+- Worst Negative Slack (WNS): inf
+
+### Schematic
+<img width="1083" height="612" alt="uart_schematic" src="https://github.com/user-attachments/assets/dd4de691-a3c9-42e4-9eb6-b3d254699b09" />
+
+
+### Utilization Report
+<img width="1920" height="1020" alt="uart_utilization" src="https://github.com/user-attachments/assets/964a40b8-5ffa-4657-99f3-75162c6836d2" />
+
+
+### Timing Report
+<img width="1920" height="1026" alt="uart_timing" src="https://github.com/user-attachments/assets/c03145dd-1cb8-4193-8e99-0234c0038120" />
+
 
 ---
 
@@ -286,14 +278,13 @@ uart_project/
 
 ## Waveform
 
-<img width="1920" height="1019" alt="uart" src="https://github.com/user-attachments/assets/7b8212e0-eb00-451d-9b7b-8e86fe0e01f4" />
+![uart](images/waveform.png)
 
-
+---
 
 ## Author
 
-**Tejaswi**
-ECE Student | Hardware Design Enthusiast
+**Tejaswi** ECE Student | Hardware Design Enthusiast  
 Building skills in VLSI, FPGA, and SoC design
 
 ---
